@@ -506,9 +506,7 @@ function Card({ l, i, mode, onOpen, fav, onFav, slots }) {
     <div className="card" onClick={() => onOpen(l)} tabIndex={0} role="button"
       onKeyDown={(e) => e.key === "Enter" && onOpen(l)}>
       <div className="ph" style={{ background: GRADS[i % GRADS.length] }}>
-        {l.photos && l.photos[0]
-          ? <LazyImg src={l.photos[0]} />
-          : (l.videoUrl && <video src={l.videoUrl + "#t=0.5"} muted playsInline preload="metadata" tabIndex={-1} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />)}
+        {l.photos && l.photos[0] && <LazyImg src={l.photos[0]} />}
         <span className="badge">📍 {l.quartier}</span>
         {(l.video || l.videoUrl) && <span className="vidbadge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Vidéo</span>}
         <button className={"card-fav" + (fav ? " on" : "")} onClick={(e) => { e.stopPropagation(); onFav(l.id); }} aria-label="Favori">
@@ -601,7 +599,6 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
             onTouchEnd={(e) => { if (touchX.current == null) return; const dx = e.changedTouches[0].clientX - touchX.current; if (medias.length > 1 && Math.abs(dx) > 40) go(dx < 0 ? 1 : -1); touchX.current = null; }}>
             {cur.type === "photo" && cur.url && <LazyImg src={cur.url} />}
             {cur.type === "video" && !playing && posterUrl && <LazyImg src={posterUrl} />}
-            {cur.type === "video" && !playing && !posterUrl && cur.url && <video src={cur.url + "#t=0.5"} muted playsInline preload="metadata" tabIndex={-1} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />}
             {cur.type === "video" && playing && cur.url && <video src={cur.url} autoPlay muted playsInline controls style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", background: "#000" }} />}
             {cur.type === "video" && !playing && (
               <>
