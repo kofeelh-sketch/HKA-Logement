@@ -315,6 +315,8 @@ const STYLE = `
 .avail.ok { color: #0B7A55; background: #DCF3E9; }
 .avail.no { color: #C1544E; background: #F6D9D6; }
 .cta:disabled, .wa:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.clim-opt { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 14px; cursor: pointer; color: var(--ink); }
+.clim-opt input { width: 18px; height: 18px; accent-color: var(--accent); flex: 0 0 auto; }
 /* ---- RÉCAP / RÉSERVATIONS ---- */
 .recap-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
 .recap-head h2 { font-size: 20px; }
@@ -536,6 +538,7 @@ function Card({ l, i, mode, onOpen, fav, onFav, slots }) {
 function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, initSlots, arrivee, datePassage }) {
   const [nuits, setNuits] = useState(initNuits || 3);
   const [slots, setSlots] = useState(initSlots && initSlots.length ? initSlots : ["jour"]);
+  const [avecClim, setAvecClim] = useState(false);
   const photoList = (l.photos && l.photos.length) ? l.photos.map(u => ({ type: "photo", url: u })) : [0, 1, 2].map(p => ({ type: "photo", p }));
   const hasVideo = !!(l.videoUrl || l.video);
   const medias = (hasVideo ? [{ type: "video", url: l.videoUrl || null }] : []).concat(photoList);
@@ -568,6 +571,7 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
 
   const calc = useMemo(() => {
     let base = 0, detail = "";
+    const units = mode === "sejour" ? nuits : slots.length;
     if (mode === "sejour") {
       base = l.prixNuit * nuits;
       detail = `${fmt(l.prixNuit)} × ${nuits} nuit${nuits > 1 ? "s" : ""}`;
@@ -575,12 +579,14 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
       base = slots.reduce((s, k) => s + (k === "jour" ? l.prixJour : l.prixSoiree), 0);
       detail = slots.map(k => k === "jour" ? "Jour (12h–20h)" : "Nuit (20h–12h)").join(" + ") || "—";
     }
-    return { base, detail, total: base };
-  }, [mode, nuits, slots, l]);
+    const climSupp = (l.clim === "option" && avecClim) ? (l.supplementClim || 0) * units : 0;
+    return { base, detail, climSupp, total: base + climSupp };
+  }, [mode, nuits, slots, l, avecClim]);
 
-  const resume = mode === "sejour"
+  const resume = (mode === "sejour"
     ? `${nuits} nuit${nuits > 1 ? "s" : ""}`
-    : (slots.map(k => k === "jour" ? "Jour" : "Nuit").join(" + ") || "—");
+    : (slots.map(k => k === "jour" ? "Jour" : "Nuit").join(" + ") || "—"))
+    + (l.clim === "option" && avecClim ? " · avec climatisation" : "");
 
   return (
     <div className="detail">
@@ -649,6 +655,9 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
 
           <h3 className="d-h3">Équipements</h3>
           <div className="d-feats">
+            {l.clim === "incluse" && <div className="d-feat"><span className="d-dot" />Climatisation incluse</div>}
+            {l.clim === "option" && <div className="d-feat"><span className="d-dot" />Ventilée · climatisation en option</div>}
+            {l.clim === "non" && <div className="d-feat"><span className="d-dot" />Ventilée</div>}
             {l.feats.map(f => <div className="d-feat" key={f}><span className="d-dot" />{f}</div>)}
           </div>
 
@@ -670,7 +679,14 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
                 </div>
               </div>
             )}
+            {l.clim === "option" && (
+              <label className="clim-opt">
+                <input type="checkbox" checked={avecClim} onChange={e => setAvecClim(e.target.checked)} />
+                <span>Ajouter la climatisation <b>+{fmt(l.supplementClim || 0)}</b> {mode === "sejour" ? "/ nuit" : "/ créneau"}</span>
+              </label>
+            )}
             <div className="line"><span>{calc.detail}</span><span>{fmt(calc.base)}</span></div>
+            {calc.climSupp > 0 && <div className="line"><span>Climatisation</span><span>+{fmt(calc.climSupp)}</span></div>}
             <div className="line tot"><span>Total</span><span>{fmt(calc.total)}</span></div>
           </div>
           {supabaseReady && (unavailable
@@ -780,7 +796,7 @@ function AdminDash({ chambres, reservations, quartiers }) {
 }
 
 function AdminChambres({ chambres, setChambres, quartiers }) {
-  const empty = { nom: "", quartier: "", type: "Chambre", cap: 2, prixNuit: "", prixJour: "", prixSoiree: "", feats: "", note: 4.8, actif: true, video: false, photos: [], videoUrl: "" };
+  const empty = { nom: "", quartier: "", type: "Chambre", cap: 2, prixNuit: "", prixJour: "", prixSoiree: "", feats: "", note: 4.8, actif: true, video: false, photos: [], videoUrl: "", clim: "non", supplementClim: "" };
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   const [delId, setDelId] = useState(null);
@@ -817,6 +833,7 @@ function AdminChambres({ chambres, setChambres, quartiers }) {
       feats: String(form.feats).split(",").map(x => x.trim()).filter(Boolean),
       actif: !!form.actif, video: !!form.videoUrl,
       photos: form.photos || [], videoUrl: form.videoUrl || "",
+      clim: form.clim || "non", supplementClim: +form.supplementClim || 0,
     };
     try {
       if (editId != null) {
@@ -835,7 +852,7 @@ function AdminChambres({ chambres, setChambres, quartiers }) {
   };
   const edit = (c) => {
     setEditId(c.id);
-    setForm({ nom: c.nom, quartier: c.quartier, type: c.type, cap: c.cap, prixNuit: c.prixNuit, prixJour: c.prixJour, prixSoiree: c.prixSoiree, feats: c.feats.join(", "), note: c.note, actif: c.actif !== false, video: !!c.video, photos: c.photos || [], videoUrl: c.videoUrl || "" });
+    setForm({ nom: c.nom, quartier: c.quartier, type: c.type, cap: c.cap, prixNuit: c.prixNuit, prixJour: c.prixJour, prixSoiree: c.prixSoiree, feats: c.feats.join(", "), note: c.note, actif: c.actif !== false, video: !!c.video, photos: c.photos || [], videoUrl: c.videoUrl || "", clim: c.clim || "non", supplementClim: c.supplementClim || "" });
     setMsg(""); setDelId(null);
     try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
   };
@@ -868,7 +885,17 @@ function AdminChambres({ chambres, setChambres, quartiers }) {
               <input className="ainput" type="number" value={form.prixSoiree} onChange={e => set("prixSoiree", e.target.value)} placeholder="18000" /></div>
           </div>
           <div className="afield"><label>Équipements (séparés par des virgules)</label>
-            <input className="ainput" value={form.feats} onChange={e => set("feats", e.target.value)} placeholder="Clim, Wifi, Lit double" /></div>
+            <input className="ainput" value={form.feats} onChange={e => set("feats", e.target.value)} placeholder="Wifi, Lit double, Eau chaude" /></div>
+          <div className="afield"><label>Climatisation</label>
+            <select className="ainput" value={form.clim} onChange={e => set("clim", e.target.value)}>
+              <option value="incluse">Climatisée (incluse)</option>
+              <option value="option">Ventilée + option clim (payante)</option>
+              <option value="non">Ventilée seule</option>
+            </select></div>
+          {form.clim === "option" && (
+            <div className="afield"><label>Supplément clim — par nuit / par créneau (FCFA)</label>
+              <input className="ainput" type="number" value={form.supplementClim} onChange={e => set("supplementClim", e.target.value)} placeholder="5000" /></div>
+          )}
           <label className="achk"><input type="checkbox" checked={form.actif} onChange={e => set("actif", e.target.checked)} /> Chambre active (visible sur le site)</label>
           <div className="afield" style={{ marginTop: 12 }}>
             <label>Photos {uploading ? "· envoi en cours…" : ""}</label>
