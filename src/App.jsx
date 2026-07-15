@@ -1357,7 +1357,7 @@ export default function HkaCourtage() {
   const [arrivee, setArrivee] = useState("2026-07-15");
   const [depart, setDepart] = useState("2026-07-18");
   const [datePassage, setDatePassage] = useState("2026-07-15");
-  const [chambres, setChambres] = useState(LOGEMENTS);
+  const [chambres, setChambres] = useState(supabaseReady ? [] : LOGEMENTS);
   const [loading, setLoading] = useState(supabaseReady);
   const [view, setView] = useState("site");
   const [adminOk, setAdminOk] = useState(false);
@@ -1374,7 +1374,7 @@ export default function HkaCourtage() {
     (async () => {
       const rows = await fetchChambres();
       if (alive) {
-        if (rows && rows.length) setChambres(rows);
+        if (rows) setChambres(rows);
         setLoading(false);
       }
     })();
