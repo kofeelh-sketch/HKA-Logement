@@ -598,24 +598,10 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
             onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
             onTouchEnd={(e) => { if (touchX.current == null) return; const dx = e.changedTouches[0].clientX - touchX.current; if (medias.length > 1 && Math.abs(dx) > 40) go(dx < 0 ? 1 : -1); touchX.current = null; }}>
             {cur.type === "photo" && cur.url && <LazyImg src={cur.url} />}
-            {cur.type === "video" && !playing && posterUrl && <LazyImg src={posterUrl} />}
-            {cur.type === "video" && playing && cur.url && <video src={cur.url} autoPlay muted playsInline controls style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", background: "#000" }} />}
-            {cur.type === "video" && !playing && (
-              <>
-                <span className="media-tag"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Vidéo</span>
-                <button className="media-play" onClick={() => setPlaying(true)} aria-label="Lire la vidéo">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                </button>
-              </>
+            {cur.type === "video" && cur.url && (
+              <video src={cur.url} poster={posterUrl || undefined} controls playsInline preload="metadata" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", background: "#000" }} />
             )}
-            {cur.type === "video" && playing && !cur.url && (
-              <div className="media-playing">
-                <button className="media-pause" onClick={() => setPlaying(false)} aria-label="Pause">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
-                </button>
-                <span>Lecture vidéo — démo</span>
-              </div>
-            )}
+            {cur.type === "video" && cur.url && <span className="media-tag"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Vidéo</span>}
           </div>
           <button className="d-round d-back" onClick={onClose} aria-label="Retour">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19" /></svg>
