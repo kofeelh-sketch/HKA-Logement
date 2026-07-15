@@ -311,6 +311,10 @@ const STYLE = `
 .cal-slot.busy { background: #F6D9D6; color: #C1544E; }
 .cal-slot:disabled { cursor: not-allowed; opacity: .7; }
 @media (max-width: 560px){ .cal-cell { min-height: 56px; } .cal-slot { width: 20px; height: 20px; } }
+.avail { border-radius: 12px; padding: 11px 14px; font-size: 13.5px; font-weight: 600; margin-top: 14px; }
+.avail.ok { color: #0B7A55; background: #DCF3E9; }
+.avail.no { color: #C1544E; background: #F6D9D6; }
+.cta:disabled, .wa:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 /* ---- RÉCAP / RÉSERVATIONS ---- */
 .recap-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
 .recap-head h2 { font-size: 20px; }
@@ -523,7 +527,7 @@ function Card({ l, i, mode, onOpen, fav, onFav }) {
   );
 }
 
-function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, initSlots }) {
+function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, initSlots, arrivee, datePassage }) {
   const [nuits, setNuits] = useState(initNuits || 3);
   const [slots, setSlots] = useState(initSlots && initSlots.length ? initSlots : ["jour"]);
   const photoList = (l.photos && l.photos.length) ? l.photos.map(u => ({ type: "photo", url: u })) : [0, 1, 2].map(p => ({ type: "photo", p }));
@@ -534,6 +538,25 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
   const [playing, setPlaying] = useState(false);
   const touchX = React.useRef(null);
   const go = (dir) => { setPlaying(false); setMi(m => (m + dir + medias.length) % medias.length); };
+  const [occ, setOcc] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    fetchOccupations(l.id).then(rows => { if (alive) setOcc(rows); });
+    return () => { alive = false; };
+  }, [l.id]);
+  const addDays = (dstr, kk) => { const p = dstr.split("-").map(Number); const dt = new Date(p[0], p[1] - 1, p[2] + kk); return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0"); };
+  const frd = (dstr) => { if (!dstr) return ""; const p = dstr.split("-").map(Number); return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }); };
+  const blocked = useMemo(() => {
+    const set = new Set(occ.map(o => o.date + "_" + o.creneau));
+    const out = [];
+    if (mode === "sejour" && arrivee) {
+      for (let x = 0; x < nuits; x++) { const day = addDays(arrivee, x); if (set.has(day + "_jour") || set.has(day + "_nuit")) out.push(frd(day)); }
+    } else if (mode !== "sejour" && datePassage) {
+      for (const sk of slots) { const cr = sk === "soiree" ? "nuit" : "jour"; if (set.has(datePassage + "_" + cr)) out.push(frd(datePassage) + " · " + (cr === "nuit" ? "Nuit" : "Jour")); }
+    }
+    return out;
+  }, [occ, mode, arrivee, nuits, slots, datePassage]);
+  const unavailable = blocked.length > 0;
   const cur = medias[mi] || { type: "photo" };
   const curBg = GRADS[(i + mi) % GRADS.length];
 
@@ -644,6 +667,9 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
             <div className="line"><span>{calc.detail}</span><span>{fmt(calc.base)}</span></div>
             <div className="line tot"><span>Total</span><span>{fmt(calc.total)}</span></div>
           </div>
+          {supabaseReady && (unavailable
+            ? <div className="avail no">Indisponible : {blocked.join(", ")}. Choisissez d'autres dates ou un autre créneau.</div>
+            : <div className="avail ok">Disponible à ces dates ✓</div>)}
         </div>
 
         <div className="d-bar">
@@ -652,8 +678,8 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
             <span>{resume}</span>
           </div>
           <div className="d-bar-actions">
-            <button className="cta" onClick={() => onReserve({ l, mode, nuits, slots: [...slots], calc, resume })}>Réserver</button>
-            <button className="wa" onClick={() => onReserve({ l, mode, nuits, slots: [...slots], calc, resume })}>WhatsApp</button>
+            <button className="cta" onClick={() => onReserve({ l, mode, nuits, slots: [...slots], calc, resume })} disabled={supabaseReady && unavailable}>Réserver</button>
+            <button className="wa" onClick={() => onReserve({ l, mode, nuits, slots: [...slots], calc, resume })} disabled={supabaseReady && unavailable}>WhatsApp</button>
           </div>
         </div>
       </div>
@@ -1459,7 +1485,7 @@ export default function HkaCourtage() {
 
           <BottomNav tab={tab} setTab={goTab} />
 
-          {open && <BookingSheet key={open.id} l={open} i={chambres.indexOf(open)} mode={mode} onClose={() => setOpen(null)} onReserve={(p) => setResaEnCours(p)} fav={favoris.includes(open.id)} onFav={toggleFav} initNuits={nuitsSejour} initSlots={slots} />}
+          {open && <BookingSheet key={open.id} l={open} i={chambres.indexOf(open)} mode={mode} onClose={() => setOpen(null)} onReserve={(p) => setResaEnCours(p)} fav={favoris.includes(open.id)} onFav={toggleFav} initNuits={nuitsSejour} initSlots={slots} arrivee={arrivee} datePassage={datePassage} />}
 
           {resaEnCours && <RecapResa resa={resaEnCours} client={client} params={params} onClose={() => setResaEnCours(null)} onConfirm={(r) => setReservations(prev => [r, ...prev])} onDone={() => { setResaEnCours(null); setOpen(null); setTab("reservations"); }} />}
         </>
