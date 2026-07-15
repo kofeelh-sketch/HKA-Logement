@@ -475,7 +475,7 @@ function SearchBar({ mode, slots, setSlots, voyageurs, setVoyageurs, arrivee, se
         <>
           <div className="field"><label>Arrivée</label><input type="date" value={arrivee} onChange={e => setArrivee(e.target.value)} /></div>
           <div className="field"><label>Départ</label><input type="date" value={depart} onChange={e => setDepart(e.target.value)} /></div>
-          <div className="field"><label>Voyageurs</label><input type="number" min="1" value={voyageurs} onChange={e => setVoy(e.target.value)} /></div>
+          <div className="field"><label>{mode === "sejour" ? "Voyageurs" : "Personnes"}</label><input type="number" min="1" value={voyageurs} onChange={e => setVoy(e.target.value)} /></div>
         </>
       ) : (
         <>
@@ -489,7 +489,7 @@ function SearchBar({ mode, slots, setSlots, voyageurs, setVoyageurs, arrivee, se
               ))}
             </div>
           </div>
-          <div className="field"><label>Voyageurs</label><input type="number" min="1" value={voyageurs} onChange={e => setVoy(e.target.value)} /></div>
+          <div className="field"><label>{mode === "sejour" ? "Voyageurs" : "Personnes"}</label><input type="number" min="1" value={voyageurs} onChange={e => setVoy(e.target.value)} /></div>
         </>
       )}
       <button className="searchbtn" onClick={onSearch}>Rechercher</button>
@@ -497,7 +497,7 @@ function SearchBar({ mode, slots, setSlots, voyageurs, setVoyageurs, arrivee, se
   );
 }
 
-function Card({ l, i, mode, onOpen, fav, onFav }) {
+function Card({ l, i, mode, onOpen, fav, onFav, slots }) {
   return (
     <div className="card" onClick={() => onOpen(l)} tabIndex={0} role="button"
       onKeyDown={(e) => e.key === "Enter" && onOpen(l)}>
@@ -520,7 +520,13 @@ function Card({ l, i, mode, onOpen, fav, onFav }) {
         <div className="price">
           {mode === "sejour"
             ? <><b>{fmt(l.prixNuit)}</b> <span className="u">/ nuit</span></>
-            : <><b>{fmt(l.prixJour)}</b> <span className="u">/ créneau jour</span></>}
+            : (() => {
+                const both = slots && slots.includes("jour") && slots.includes("soiree");
+                const onlyNuit = slots && slots.includes("soiree") && !slots.includes("jour");
+                const v = both ? l.prixJour + l.prixSoiree : onlyNuit ? l.prixSoiree : l.prixJour;
+                const u = both ? "/ journée (jour + nuit)" : onlyNuit ? "/ créneau nuit" : "/ créneau jour";
+                return <><b>{fmt(v)}</b> <span className="u">{u}</span></>;
+              })()}
         </div>
       </div>
     </div>
@@ -1430,7 +1436,7 @@ export default function HkaCourtage() {
               <SkeletonGrid />
             ) : liste.length > 0 ? (
               <div className="grid">
-                {liste.map((l) => <Card key={l.id} l={l} i={chambres.indexOf(l)} mode={mode} onOpen={setOpen} fav={favoris.includes(l.id)} onFav={toggleFav} />)}
+                {liste.map((l) => <Card key={l.id} l={l} i={chambres.indexOf(l)} mode={mode} onOpen={setOpen} fav={favoris.includes(l.id)} onFav={toggleFav} slots={slots} />)}
               </div>
             ) : (
               <p style={{ color: "var(--muted)", padding: "20px 0 60px" }}>Aucune chambre ne correspond à votre recherche. Réduisez le nombre de voyageurs ou changez de quartier.</p>
@@ -1476,7 +1482,7 @@ export default function HkaCourtage() {
                 : <div className="wrap">
                     <div className="rowlabel"><h2 className="disp">Vos favoris</h2><span>{favoris.length} chambre{favoris.length > 1 ? "s" : ""}</span></div>
                     <div className="grid">
-                      {chambres.filter(c => favoris.includes(c.id)).map(l => <Card key={l.id} l={l} i={chambres.indexOf(l)} mode={mode} onOpen={setOpen} fav={true} onFav={toggleFav} />)}
+                      {chambres.filter(c => favoris.includes(c.id)).map(l => <Card key={l.id} l={l} i={chambres.indexOf(l)} mode={mode} onOpen={setOpen} fav={true} onFav={toggleFav} slots={slots} />)}
                     </div>
                   </div>
             )}
