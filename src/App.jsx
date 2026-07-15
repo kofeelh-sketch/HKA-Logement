@@ -937,7 +937,7 @@ function AdminChambres({ chambres, setChambres, quartiers }) {
             {form.videoUrl ? <p style={{ fontSize: 12, color: "var(--pine)", marginTop: 6 }}>Vidéo chargée ✓ <button type="button" onClick={() => set("videoUrl", "")} style={{ border: 0, background: "none", color: "#C1544E", cursor: "pointer", textDecoration: "underline" }}>retirer</button></p> : null}
           </div>
           <div className="abtns" style={{ marginTop: 14 }}>
-            <button className="abtn" onClick={submit}>{editId != null ? "Enregistrer" : "Ajouter la chambre"}</button>
+            <button className="abtn" onClick={submit} disabled={uploading}>{uploading ? "Envoi du média…" : (editId != null ? "Enregistrer" : "Ajouter la chambre")}</button>
             {editId != null && <button className="abtn ghost" onClick={cancel}>Annuler</button>}
           </div>
           {msg && <p style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: msg.startsWith("err") ? "#C1544E" : "var(--pine)" }}>{msg.slice(msg.indexOf(":") + 1)}</p>}
