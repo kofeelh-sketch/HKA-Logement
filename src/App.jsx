@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { supabase, supabaseReady } from "./lib/supabase.js";
 import { fetchChambres, createChambre, updateChambre, removeChambre } from "./lib/chambres.js";
 import { uploadMedia } from "./lib/storage.js";
+import { fetchOccupations, addBlock, removeBlock } from "./lib/occupations.js";
 
 // ============================================================
 //  HKA · COURTAGE — Maquette (v1)
@@ -291,6 +292,25 @@ const STYLE = `
 .media-nav svg { width: 20px; height: 20px; }
 .media-nav.prev { left: 12px; }
 .media-nav.next { right: 12px; }
+
+/* ---- CALENDRIER DISPONIBILITÉS ---- */
+.cal-head { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 16px 0 12px; }
+.cal-head b { font-size: 17px; min-width: 170px; text-align: center; }
+.cal-legend { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+.cal-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 4px; margin-right: 5px; vertical-align: -1px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; max-width: 560px; }
+.cal-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding-bottom: 2px; }
+.cal-cell { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 6px 4px 7px; display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 62px; }
+.cal-cell.empty { border: 0; background: transparent; }
+.cal-cell.past { opacity: .38; }
+.cal-num { font-size: 13px; font-weight: 700; color: var(--ink); }
+.cal-slots { display: flex; gap: 4px; }
+.cal-slot { width: 22px; height: 22px; border-radius: 7px; border: 0; cursor: pointer; font-size: 11px; font-weight: 800; font-family: 'Bricolage Grotesque', sans-serif; transition: transform .1s; }
+.cal-slot:active { transform: scale(.88); }
+.cal-slot.free { background: #DCF3E9; color: #0B7A55; }
+.cal-slot.busy { background: #F6D9D6; color: #C1544E; }
+.cal-slot:disabled { cursor: not-allowed; opacity: .7; }
+@media (max-width: 560px){ .cal-cell { min-height: 56px; } .cal-slot { width: 20px; height: 20px; } }
 /* ---- RÉCAP / RÉSERVATIONS ---- */
 .recap-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
 .recap-head h2 { font-size: 20px; }
@@ -689,13 +709,14 @@ function AdminPanel({ chambres, setChambres, quartiers, reservations, setReserva
         <button className="adminbtn" style={{ marginLeft: "auto" }} onClick={onExit}>← Retour au site</button>
       </div>
       <div className="admin-tabs">
-        {[["dash", "Tableau de bord"], ["chambres", "Chambres"], ["resas", "Réservations"], ["params", "Paramètres"]].map(([k, l]) => (
+        {[["dash", "Tableau de bord"], ["chambres", "Chambres"], ["resas", "Réservations"], ["dispos", "Disponibilités"], ["params", "Paramètres"]].map(([k, l]) => (
           <button key={k} className={"admin-tab" + (section === k ? " on" : "")} onClick={() => setSection(k)}>{l}</button>
         ))}
       </div>
       {section === "dash" && <AdminDash chambres={chambres} reservations={reservations} quartiers={quartiers} />}
       {section === "chambres" && <AdminChambres chambres={chambres} setChambres={setChambres} quartiers={quartiers} />}
       {section === "resas" && <AdminResas reservations={reservations} setReservations={setReservations} />}
+      {section === "dispos" && <AdminDispos chambres={chambres} />}
       {section === "params" && <AdminParams params={params} setParams={setParams} />}
     </div>
   );
@@ -906,6 +927,92 @@ function AdminResas({ reservations, setReservations }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function AdminDispos({ chambres }) {
+  const [cid, setCid] = useState(chambres[0] ? chambres[0].id : "");
+  const [ref, setRef] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const [occ, setOcc] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => { if (!cid && chambres[0]) setCid(chambres[0].id); }, [chambres]);
+  useEffect(() => {
+    if (!cid) { setOcc([]); return; }
+    let alive = true;
+    fetchOccupations(cid).then(rows => { if (alive) setOcc(rows); });
+    return () => { alive = false; };
+  }, [cid]);
+
+  const k = (date, cr) => date + "_" + cr;
+  const map = {};
+  occ.forEach(o => { map[k(o.date, o.creneau)] = o; });
+  const iso = (y, m, d) => y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+  const now = new Date();
+  const todayIso = iso(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const toggle = async (dateStr, cr) => {
+    if (!cid || busy) return;
+    setBusy(true); setMsg("");
+    const ex = map[k(dateStr, cr)];
+    try {
+      if (ex) { await removeBlock(ex.id); setOcc(p => p.filter(o => o.id !== ex.id)); }
+      else { const row = await addBlock(cid, dateStr, cr); setOcc(p => [...p, row]); }
+    } catch (e) { setMsg("Action refusée — " + (e.message || "connecte-toi en admin.")); }
+    setBusy(false);
+  };
+
+  const first = new Date(ref.y, ref.m, 1);
+  const startDow = (first.getDay() + 6) % 7;
+  const daysInMonth = new Date(ref.y, ref.m + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const monthName = first.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  const prevM = () => setRef(r => r.m === 0 ? { y: r.y - 1, m: 11 } : { y: r.y, m: r.m - 1 });
+  const nextM = () => setRef(r => r.m === 11 ? { y: r.y + 1, m: 0 } : { y: r.y, m: r.m + 1 });
+
+  return (
+    <>
+      <p className="admin-sub">Bloquez les créneaux indisponibles (entretien, location hors app, réservation déjà confirmée). Ces dates sont partagées avec tous les clients.</p>
+      <div className="afield" style={{ maxWidth: 340 }}>
+        <label>Chambre</label>
+        <select className="ainput" value={cid} onChange={e => setCid(e.target.value)}>
+          {chambres.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+        </select>
+      </div>
+      <div className="cal-legend">
+        <span><i style={{ background: "#DCF3E9" }} />Libre — cliquez pour bloquer</span>
+        <span><i style={{ background: "#F6D9D6" }} />Bloqué — cliquez pour libérer</span>
+      </div>
+      <div className="cal-head">
+        <button className="abtn ghost small" onClick={prevM} aria-label="Mois précédent">‹</button>
+        <b className="disp" style={{ textTransform: "capitalize" }}>{monthName}</b>
+        <button className="abtn ghost small" onClick={nextM} aria-label="Mois suivant">›</button>
+      </div>
+      <div className="cal-grid">
+        {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map(d => <div key={d} className="cal-dow">{d}</div>)}
+        {cells.map((d, idx) => {
+          if (!d) return <div key={"e" + idx} className="cal-cell empty" />;
+          const dateStr = iso(ref.y, ref.m, d);
+          const jour = !!map[k(dateStr, "jour")];
+          const nuit = !!map[k(dateStr, "nuit")];
+          const past = dateStr < todayIso;
+          return (
+            <div key={dateStr} className={"cal-cell" + (past ? " past" : "")}>
+              <span className="cal-num">{d}</span>
+              <div className="cal-slots">
+                <button className={"cal-slot " + (jour ? "busy" : "free")} disabled={past || busy} onClick={() => toggle(dateStr, "jour")} title="Jour 12h-20h">J</button>
+                <button className={"cal-slot " + (nuit ? "busy" : "free")} disabled={past || busy} onClick={() => toggle(dateStr, "nuit")} title="Nuit 20h-12h">N</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {msg && <p style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: "#C1544E" }}>{msg}</p>}
+      <p style={{ marginTop: 12, fontSize: 12.5, color: "var(--muted)" }}>Astuce : bloquez <b>J</b> et <b>N</b> le même jour pour rendre la chambre indisponible toute la journée (nuitée comprise).</p>
+    </>
   );
 }
 
