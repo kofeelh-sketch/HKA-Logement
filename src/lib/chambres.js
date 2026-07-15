@@ -26,6 +26,7 @@ export function rowToChambre(r) {
     video: !!r.video_url || !!r.video,
     clim: r.clim || "non",
     supplementClim: r.supplement_clim ?? 0,
+    description: r.description || "",
   };
 }
 
@@ -49,6 +50,7 @@ export function chambreToRow(c) {
     video: !!c.video || !!c.videoUrl,
     clim: c.clim || "non",
     supplement_clim: c.supplementClim ?? 0,
+    description: c.description || null,
   };
 }
 

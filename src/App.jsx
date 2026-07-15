@@ -652,8 +652,10 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
             <div className="d-note">★ {l.note.toFixed(2)}<span>{l.avis} avis</span></div>
           </div>
 
-          <p className="d-desc">
-            {mode === "sejour"
+          <p className="d-desc" style={{ whiteSpace: "pre-line" }}>
+            {l.description
+              ? l.description
+              : mode === "sejour"
               ? `Chambre meublée à ${l.quartier}, disponible à la nuitée pour ${l.cap} personne${l.cap > 1 ? "s" : ""}. Réservation directe, confirmation par WhatsApp.`
               : `Chambre meublée à ${l.quartier}, disponible au créneau (Jour 12h–20h ou Nuit 20h–12h). Idéale pour une escale ou un repos express.`}
           </p>
@@ -801,7 +803,7 @@ function AdminDash({ chambres, reservations, quartiers }) {
 }
 
 function AdminChambres({ chambres, setChambres, quartiers }) {
-  const empty = { nom: "", quartier: "", type: "Chambre", cap: 2, prixNuit: "", prixJour: "", prixSoiree: "", feats: "", featsCommuns: [], note: 4.8, actif: true, video: false, photos: [], videoUrl: "", clim: "non", supplementClim: "" };
+  const empty = { nom: "", quartier: "", type: "Chambre", cap: 2, prixNuit: "", prixJour: "", prixSoiree: "", feats: "", featsCommuns: [], note: 4.8, actif: true, video: false, photos: [], videoUrl: "", clim: "non", supplementClim: "", description: "" };
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   const [delId, setDelId] = useState(null);
@@ -839,6 +841,7 @@ function AdminChambres({ chambres, setChambres, quartiers }) {
       actif: !!form.actif, video: !!form.videoUrl,
       photos: form.photos || [], videoUrl: form.videoUrl || "",
       clim: form.clim || "non", supplementClim: +form.supplementClim || 0,
+      description: (form.description || "").trim(),
     };
     try {
       if (editId != null) {
@@ -857,7 +860,7 @@ function AdminChambres({ chambres, setChambres, quartiers }) {
   };
   const edit = (c) => {
     setEditId(c.id);
-    setForm({ nom: c.nom, quartier: c.quartier, type: c.type, cap: c.cap, prixNuit: c.prixNuit, prixJour: c.prixJour, prixSoiree: c.prixSoiree, feats: (c.feats || []).filter(f => !FEATS_COMMUNS.includes(f)).join(", "), featsCommuns: (c.feats || []).filter(f => FEATS_COMMUNS.includes(f)), note: c.note, actif: c.actif !== false, video: !!c.video, photos: c.photos || [], videoUrl: c.videoUrl || "", clim: c.clim || "non", supplementClim: c.supplementClim || "" });
+    setForm({ nom: c.nom, quartier: c.quartier, type: c.type, cap: c.cap, prixNuit: c.prixNuit, prixJour: c.prixJour, prixSoiree: c.prixSoiree, feats: (c.feats || []).filter(f => !FEATS_COMMUNS.includes(f)).join(", "), featsCommuns: (c.feats || []).filter(f => FEATS_COMMUNS.includes(f)), note: c.note, actif: c.actif !== false, video: !!c.video, photos: c.photos || [], videoUrl: c.videoUrl || "", clim: c.clim || "non", supplementClim: c.supplementClim || "", description: c.description || "" });
     setMsg(""); setDelId(null);
     try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
   };
@@ -873,6 +876,8 @@ function AdminChambres({ chambres, setChambres, quartiers }) {
           <h3>{editId != null ? "Modifier la chambre" : "Ajouter une chambre"}</h3>
           <div className="afield"><label>Nom</label>
             <input className="ainput" value={form.nom} onChange={e => set("nom", e.target.value)} placeholder="Chambre Ouakam Vue Mer" /></div>
+          <div className="afield"><label>Description (laisser vide = texte automatique)</label>
+            <textarea className="ainput" rows={3} style={{ resize: "vertical", fontFamily: "inherit" }} value={form.description} onChange={e => set("description", e.target.value)} placeholder="Décrivez la chambre : ambiance, atouts, quartier, règles..." /></div>
           <div className="arow">
             <div className="afield"><label>Quartier</label>
               <input className="ainput" list="qlist" value={form.quartier} onChange={e => set("quartier", e.target.value)} placeholder="Ouakam" />
