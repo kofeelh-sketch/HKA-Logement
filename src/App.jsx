@@ -285,6 +285,12 @@ const STYLE = `
 .media-dots { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 7px; }
 .media-dots .dot { width: 7px; height: 7px; border-radius: 999px; border: 0; background: rgba(255,255,255,.5); cursor: pointer; padding: 0; transition: width .2s; }
 .media-dots .dot.on { background: #fff; width: 20px; }
+.media-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; border-radius: 999px; border: 0; background: rgba(23,20,15,.42); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 3; transition: background .15s, transform .12s; }
+.media-nav:hover { background: rgba(23,20,15,.62); }
+.media-nav:active { transform: translateY(-50%) scale(.9); }
+.media-nav svg { width: 20px; height: 20px; }
+.media-nav.prev { left: 12px; }
+.media-nav.next { right: 12px; }
 /* ---- RÉCAP / RÉSERVATIONS ---- */
 .recap-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
 .recap-head h2 { font-size: 20px; }
@@ -506,6 +512,8 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
   const posterUrl = (l.photos && l.photos[0]) || null;
   const [mi, setMi] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const touchX = React.useRef(null);
+  const go = (dir) => { setPlaying(false); setMi(m => (m + dir + medias.length) % medias.length); };
   const cur = medias[mi] || { type: "photo" };
   const curBg = GRADS[(i + mi) % GRADS.length];
 
@@ -529,7 +537,9 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
     <div className="detail">
       <div className="detail-inner">
         <div className="detail-photo">
-          <div className="media-view" style={{ background: curBg }}>
+          <div className="media-view" style={{ background: curBg }}
+            onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+            onTouchEnd={(e) => { if (touchX.current == null) return; const dx = e.changedTouches[0].clientX - touchX.current; if (medias.length > 1 && Math.abs(dx) > 40) go(dx < 0 ? 1 : -1); touchX.current = null; }}>
             {cur.type === "photo" && cur.url && <LazyImg src={cur.url} />}
             {cur.type === "video" && !playing && posterUrl && <LazyImg src={posterUrl} />}
             {cur.type === "video" && playing && cur.url && <video src={cur.url} autoPlay muted playsInline controls style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", background: "#000" }} />}
@@ -556,6 +566,16 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
           <button className={"d-round d-fav" + (fav ? " on" : "")} onClick={() => onFav(l.id)} aria-label="Favori">
             <svg viewBox="0 0 24 24" fill={fav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M12 20 C12 20 3 14 3 8.5 C3 5.5 5.4 4 7.5 4 C9.3 4 11 5.2 12 6.8 C13 5.2 14.7 4 16.5 4 C18.6 4 21 5.5 21 8.5 C21 14 12 20 12 20 Z" /></svg>
           </button>
+          {medias.length > 1 && (
+            <>
+              <button className="media-nav prev" onClick={() => go(-1)} aria-label="Photo précédente">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5 L8 12 L15 19"/></svg>
+              </button>
+              <button className="media-nav next" onClick={() => go(1)} aria-label="Photo suivante">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5 L16 12 L9 19"/></svg>
+              </button>
+            </>
+          )}
           <div className="media-dots">
             {medias.map((m, idx) => (
               <button key={idx} className={"dot" + (idx === mi ? " on" : "")} onClick={() => { setMi(idx); setPlaying(false); }} aria-label={"Média " + (idx + 1)} />
