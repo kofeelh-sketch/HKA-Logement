@@ -1047,11 +1047,25 @@ function AdminDispos({ chambres }) {
   return (
     <>
       <p className="admin-sub">Bloquez les créneaux indisponibles (entretien, location hors app, réservation déjà confirmée). Ces dates sont partagées avec tous les clients.</p>
-      <div className="afield" style={{ maxWidth: 340 }}>
-        <label>Chambre</label>
-        <select className="ainput" value={cid} onChange={e => setCid(e.target.value)}>
-          {chambres.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-        </select>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, maxWidth: 420 }}>
+        {(() => {
+          const sc = chambres.find(c => c.id === cid);
+          return (
+            <div style={{ width: 56, height: 56, borderRadius: 12, flex: "0 0 auto", overflow: "hidden", background: "#E9E2D4", marginBottom: 2 }}>
+              {sc && sc.photos && sc.photos[0]
+                ? <img src={sc.photos[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : (sc && sc.videoUrl
+                  ? <video src={sc.videoUrl} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : null)}
+            </div>
+          );
+        })()}
+        <div className="afield" style={{ flex: 1, margin: 0 }}>
+          <label>Chambre</label>
+          <select className="ainput" value={cid} onChange={e => setCid(e.target.value)}>
+            {chambres.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </select>
+        </div>
       </div>
       <div className="cal-legend">
         <span><i style={{ background: "#DCF3E9" }} />Libre — cliquez pour bloquer</span>
