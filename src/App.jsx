@@ -369,6 +369,7 @@ const STYLE = `
 .resa-row { display: flex; align-items: center; gap: 12px; }
 .resa-statut.ok { color: #0B7A55; background: #DCF3E9; }
 .resa-statut.warn { color: #9A6A1E; background: #F6E7CC; }
+.resa-statut.off { color: var(--muted); background: #ECE6DA; }
 .resa-annuler { border: 1px solid #E3B7B4; background: #fff; color: #C1544E; font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 13px; padding: 9px 14px; border-radius: 12px; cursor: pointer; align-self: flex-start; }
 
 /* ---- SKELETONS + MICRO-INTERACTIONS ---- */
@@ -1663,11 +1664,11 @@ export default function HkaCourtage() {
                             <span>{r.quartier} · {r.mode === "sejour" ? "Séjour" : "Passage"} · {r.resume}{r.pay ? " · " + r.pay : ""}{r.date ? " · " + r.date : ""}</span>
                           </div>
                           <div className="resa-right">
-                            <span className={"resa-statut" + (r.garanti ? " ok" : " warn")}>{r.statut}</span>
+                            <span className={"resa-statut" + (r.statut === "Annulée" ? " off" : r.garanti ? " ok" : " warn")}>{r.statut}</span>
                             <b>{fmt(r.total)}</b>
                           </div>
                         </div>
-                        {!r.garanti && (
+                        {!r.garanti && r.statut !== "Annulée" && (
                           <div className="resa-warn">
                             <span>Chambre non bloquée — prévenez avant de venir.</span>
                             <button className="resa-prevenir" onClick={() => { try { window.open("https://wa.me/" + (params.wa || WA_NUMBER) + "?text=" + encodeURIComponent("Bonjour " + params.marque + ", je compte venir pour ma réservation (" + r.chambre + " — " + r.resume + "). Est-elle toujours disponible ?"), "_blank"); } catch (e) {} }}>Prévenir avant de venir</button>
