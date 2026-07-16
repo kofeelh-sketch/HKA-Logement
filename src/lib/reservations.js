@@ -65,3 +65,14 @@ export async function updateReservationStatut(id, statut, garanti) {
     .eq("id", id);
   if (error) throw error;
 }
+
+// Annulation côté client : passe le statut à "Annulée" (persistant).
+// Autorisé par une policy RLS dédiée (uniquement vers "Annulée").
+export async function cancelReservation(id) {
+  if (!supabaseReady) return;
+  const { error } = await supabase
+    .from("reservations")
+    .update({ statut: "Annulée", garanti: false })
+    .eq("id", id);
+  if (error) throw error;
+}

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { supabase, supabaseReady } from "./lib/supabase.js";
 import { fetchChambres, createChambre, updateChambre, removeChambre } from "./lib/chambres.js";
 import { uploadMedia } from "./lib/storage.js";
-import { createReservation, fetchReservations, updateReservationStatut } from "./lib/reservations.js";
+import { createReservation, fetchReservations, updateReservationStatut, cancelReservation } from "./lib/reservations.js";
 import { logEvent, fetchStats } from "./lib/stats.js";
 import { fetchAvis, fetchAllAvis, createAvis, approveAvis, removeAvis } from "./lib/avis.js";
 import { fetchOccupations, addBlock, removeBlock, blockOccupations } from "./lib/occupations.js";
@@ -1678,6 +1678,7 @@ export default function HkaCourtage() {
                           <button className="resa-annuler" onClick={() => {
                             if (!window.confirm("Annuler cette réservation ?")) return;
                             setReservations(prev => prev.map(x => x.id === r.id ? { ...x, statut: "Annulée", garanti: false } : x));
+                            try { cancelReservation(r.id); } catch (e) {}
                             try { window.open("https://wa.me/" + (params.wa || WA_NUMBER) + "?text=" + encodeURIComponent("Bonjour " + params.marque + ", je souhaite ANNULER ma réservation (" + r.chambre + " — " + r.resume + (r.date ? " · " + r.date : "") + "). Merci."), "_blank"); } catch (e) {}
                           }}>Annuler ma réservation</button>
                         )}
