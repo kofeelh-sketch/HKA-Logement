@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from "react";
 import { supabase, supabaseReady } from "./lib/supabase.js";
 import { fetchChambres, createChambre, updateChambre, removeChambre } from "./lib/chambres.js";
 import { uploadMedia } from "./lib/storage.js";
+import { createReservation, fetchReservations, updateReservationStatut } from "./lib/reservations.js";
+import { logEvent, fetchStats } from "./lib/stats.js";
 import { fetchOccupations, addBlock, removeBlock } from "./lib/occupations.js";
 
 // ============================================================
@@ -761,6 +763,8 @@ function AdminPanel({ chambres, setChambres, quartiers, reservations, setReserva
 }
 
 function AdminDash({ chambres, reservations, quartiers }) {
+  const [stats, setStats] = useState(null);
+  useEffect(() => { fetchStats().then(setStats); }, []);
   const actives = chambres.filter(c => c.actif !== false).length;
   const inactives = chambres.length - actives;
   const aConf = reservations.filter(r => r.statut === "À confirmer").length;
@@ -769,6 +773,8 @@ function AdminDash({ chambres, reservations, quartiers }) {
   const cards = [
     ["Chambres", chambres.length, actives + " active" + (actives > 1 ? "s" : "") + " · " + inactives + " inactive" + (inactives > 1 ? "s" : "")],
     ["Réservations", reservations.length, aConf + " à confirmer · " + conf + " confirmée" + (conf > 1 ? "s" : "")],
+    ["Visites", stats ? stats.visites : "—", stats ? stats.visitesJour + " aujourd'hui" : "chargement…"],
+    ["Clics WhatsApp", stats ? stats.whatsapp : "—", "demandes lancées"],
     ["Quartiers", quartiers.length - 1, "à Dakar"],
     ["Sans vidéo", sansVid, "chambre" + (sansVid > 1 ? "s" : "") + " sans clip"],
   ];
@@ -965,7 +971,10 @@ function AdminChambres({ chambres, setChambres, quartiers }) {
 }
 
 function AdminResas({ reservations, setReservations }) {
-  const setStatut = (id, statut, garanti) => setReservations(prev => prev.map(r => r.id === id ? { ...r, statut, garanti } : r));
+  const setStatut = async (id, statut, garanti) => {
+    setReservations(prev => prev.map(r => r.id === id ? { ...r, statut, garanti } : r));
+    try { await updateReservationStatut(id, statut, garanti); } catch (e) {}
+  };
   if (reservations.length === 0) return <p className="admin-sub">Aucune réservation pour l'instant. Les demandes des clients apparaîtront ici.</p>;
   return (
     <div className="acard">
@@ -1175,6 +1184,7 @@ function RecapResa({ resa, onClose, onConfirm, onDone, client, params = {} }) {
   const payLabel = { wave: "Wave", orange: "Orange Money", especes: "Espèces à l'arrivée" };
 
   const openWA = (texte) => {
+    logEvent("whatsapp", "reservation");
     try { window.open("https://wa.me/" + (params.wa || WA_NUMBER) + "?text=" + encodeURIComponent(texte), "_blank"); } catch (e) {}
   };
 
@@ -1187,13 +1197,15 @@ function RecapResa({ resa, onClose, onConfirm, onDone, client, params = {} }) {
     (nom ? "\n• Nom : " + nom : "") +
     (tel ? "\n• Tél : " + tel : "");
 
-  const finalize = (g) => {
-    onConfirm({
+  const finalize = async (g) => {
+    const base = {
       id: Date.now(), nom, tel, chambre: l.nom, quartier: l.quartier, mode, resume,
       total: calc.total, pay: payLabel[pay], garanti: g,
       statut: g ? "Confirmée" : "À confirmer",
       date: new Date().toLocaleDateString("fr-FR"),
-    });
+    };
+    const saved = await createReservation(base);
+    onConfirm(saved);
     openWA(messageResa(g));
     setGaranti(g);
     setStep("done");
@@ -1372,6 +1384,12 @@ export default function HkaCourtage() {
       if (email && admin && email.toLowerCase() === admin) setAdminOk(true);
     });
   }, []);
+
+  useEffect(() => {
+    if (adminOk && supabaseReady) fetchReservations().then(rows => { if (rows && rows.length) setReservations(rows); });
+  }, [adminOk]);
+
+  useEffect(() => { logEvent("visite"); }, []);
 
   const quartiers = ["Tous", ...Array.from(new Set(chambres.map(c => c.quartier)))];
   const priceKey = mode === "sejour" ? "prixNuit" : "prixJour";
