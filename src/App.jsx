@@ -937,7 +937,11 @@ function AdminChambres({ chambres, setChambres, quartiers }) {
           <div className="alist">
             {chambres.map((c, i) => (
               <div className="aitem" key={c.id}>
-                <div className="sw" style={{ background: GRADS[i % GRADS.length], opacity: c.actif !== false ? 1 : 0.4 }} />
+                <div className="sw" style={{ background: GRADS[i % GRADS.length], opacity: c.actif !== false ? 1 : 0.4, overflow: "hidden", position: "relative" }}>
+                  {c.photos && c.photos[0]
+                    ? <img src={c.photos[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : (c.videoUrl ? <video src={c.videoUrl} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null)}
+                </div>
                 <div className="info">
                   <b>{c.nom}</b>
                   <span><span className="pill">{c.quartier}</span>{fmt(c.prixNuit)} / nuit · {c.cap} pers.</span>
