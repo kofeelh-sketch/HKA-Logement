@@ -1413,7 +1413,7 @@ export default function HkaCourtage() {
   const nuitsSejour = Math.max(1, Math.round((new Date(depart) - new Date(arrivee)) / 86400000) || 1);
   const onSearch = () => { const el = document.getElementById("resultats"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const goTab = (id) => { setTab(id); try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {} };
-  let liste = chambres.filter(l => (quartier === "Tous" || l.quartier === quartier) && l.cap >= voyageurs && l.actif !== false);
+  let liste = chambres.filter(l => (quartier === "Tous" || l.quartier === quartier) && l.cap >= voyageurs && l.actif !== false && (mode === "sejour" ? (l.prixNuit > 0) : (l.prixJour > 0 || l.prixSoiree > 0)));
   if (tri === "prixAsc") liste = [...liste].sort((a, b) => a[priceKey] - b[priceKey]);
   else if (tri === "prixDesc") liste = [...liste].sort((a, b) => b[priceKey] - a[priceKey]);
   else if (tri === "note") liste = [...liste].sort((a, b) => b.note - a.note);
