@@ -369,6 +369,7 @@ const STYLE = `
 .resa-row { display: flex; align-items: center; gap: 12px; }
 .resa-statut.ok { color: #0B7A55; background: #DCF3E9; }
 .resa-statut.warn { color: #9A6A1E; background: #F6E7CC; }
+.resa-annuler { border: 1px solid #E3B7B4; background: #fff; color: #C1544E; font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 13px; padding: 9px 14px; border-radius: 12px; cursor: pointer; align-self: flex-start; }
 
 /* ---- SKELETONS + MICRO-INTERACTIONS ---- */
 .skel { pointer-events: none; }
@@ -1671,6 +1672,13 @@ export default function HkaCourtage() {
                             <span>Chambre non bloquée — prévenez avant de venir.</span>
                             <button className="resa-prevenir" onClick={() => { try { window.open("https://wa.me/" + (params.wa || WA_NUMBER) + "?text=" + encodeURIComponent("Bonjour " + params.marque + ", je compte venir pour ma réservation (" + r.chambre + " — " + r.resume + "). Est-elle toujours disponible ?"), "_blank"); } catch (e) {} }}>Prévenir avant de venir</button>
                           </div>
+                        )}
+                        {r.statut !== "Annulée" && (
+                          <button className="resa-annuler" onClick={() => {
+                            if (!window.confirm("Annuler cette réservation ?")) return;
+                            setReservations(prev => prev.map(x => x.id === r.id ? { ...x, statut: "Annulée", garanti: false } : x));
+                            try { window.open("https://wa.me/" + (params.wa || WA_NUMBER) + "?text=" + encodeURIComponent("Bonjour " + params.marque + ", je souhaite ANNULER ma réservation (" + r.chambre + " — " + r.resume + (r.date ? " · " + r.date : "") + "). Merci."), "_blank"); } catch (e) {}
+                          }}>Annuler ma réservation</button>
                         )}
                       </div>
                     ))}
