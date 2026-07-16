@@ -669,9 +669,21 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
             <svg viewBox="0 0 24 24" fill={fav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M12 20 C12 20 3 14 3 8.5 C3 5.5 5.4 4 7.5 4 C9.3 4 11 5.2 12 6.8 C13 5.2 14.7 4 16.5 4 C18.6 4 21 5.5 21 8.5 C21 14 12 20 12 20 Z" /></svg>
           </button>
           <button className="d-round d-share" aria-label="Partager cette chambre" onClick={() => {
-            const url = window.location.origin + window.location.pathname + "?chambre=" + l.id;
-            const prix = mode === "sejour" ? (l.prixNuit ? fmt(l.prixNuit) + " / nuit" : "") : (l.prixJour ? fmt(l.prixJour) + " / créneau" : "");
-            const texte = "🏠 " + l.nom + " — " + l.quartier + (prix ? "\n" + prix : "") + "\n👉 " + url;
+            const qp = new URLSearchParams();
+            qp.set("chambre", l.id);
+            qp.set("mode", mode);
+            let cfg;
+            if (mode === "sejour") {
+              if (arrivee) qp.set("arrivee", arrivee);
+              qp.set("nuits", String(nuits));
+              cfg = "Séjour — " + nuits + " nuit" + (nuits > 1 ? "s" : "");
+            } else {
+              if (datePassage) qp.set("date", datePassage);
+              qp.set("slots", slots.join(","));
+              cfg = "Passage — " + (slots.map(k => k === "jour" ? "Jour 12h–20h" : "Nuit 20h–12h").join(" + ") || "—");
+            }
+            const url = window.location.origin + window.location.pathname + "?" + qp.toString();
+            const texte = "🏠 " + l.nom + " — " + l.quartier + "\n" + cfg + "\n💰 " + fmt(calc.total) + "\n👉 " + url;
             if (navigator.share) { navigator.share({ title: l.nom, text: texte, url }).catch(() => {}); }
             else { try { window.open("https://wa.me/?text=" + encodeURIComponent(texte), "_blank"); } catch (e) {} }
           }}>
@@ -1490,7 +1502,7 @@ export default function HkaCourtage() {
   const [mode, setMode] = useState("sejour");
   const [slots, setSlots] = useState(["jour"]);
   const [open, setOpen] = useState(null);
-  const [deepId] = useState(() => { try { return new URLSearchParams(window.location.search).get("chambre"); } catch (e) { return null; } });
+  const [deepParams] = useState(() => { try { const q = new URLSearchParams(window.location.search); return { chambre: q.get("chambre"), mode: q.get("mode"), slots: q.get("slots"), date: q.get("date"), arrivee: q.get("arrivee"), nuits: q.get("nuits") }; } catch (e) { return {}; } });
   const [deepDone, setDeepDone] = useState(false);
   const [ville, setVille] = useState("Dakar");
   const [quartier, setQuartier] = useState("Tous");
@@ -1524,11 +1536,25 @@ export default function HkaCourtage() {
   }, [adminOk]);
 
   useEffect(() => {
-    if (!deepDone && deepId && chambres.length) {
-      const m = chambres.find(c => String(c.id) === String(deepId));
+    if (!deepDone && deepParams.chambre && chambres.length) {
+      const m = chambres.find(c => String(c.id) === String(deepParams.chambre));
       if (m) { setOpen(m); setDeepDone(true); }
     }
-  }, [chambres, deepId, deepDone]);
+  }, [chambres, deepDone]);
+
+  useEffect(() => {
+    const dp = deepParams;
+    if (dp.mode === "passage" || dp.mode === "sejour") setMode(dp.mode);
+    if (dp.slots) setSlots(dp.slots.split(",").filter(Boolean));
+    if (dp.date) setDatePassage(dp.date);
+    if (dp.arrivee) {
+      setArrivee(dp.arrivee);
+      const n = parseInt(dp.nuits, 10) || 1;
+      const pr = dp.arrivee.split("-").map(Number);
+      const d = new Date(pr[0], pr[1] - 1, pr[2] + n);
+      setDepart(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
+    }
+  }, []);
 
   useEffect(() => {
     if (!supabaseReady) return;
