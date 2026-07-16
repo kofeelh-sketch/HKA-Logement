@@ -265,6 +265,7 @@ const STYLE = `
 .d-round svg { width: 20px; height: 20px; }
 .d-back { left: 16px; color: var(--ink); }
 .d-fav { right: 16px; color: var(--pine); }
+.d-share { right: 64px; color: var(--pine); }
 .d-count { position: absolute; bottom: 16px; right: 16px; background: rgba(23,20,15,.6); color: #fff; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
 .detail-body { flex: 1 1 auto; padding: 20px 22px; }
 .d-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
@@ -664,6 +665,15 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
           </button>
           <button className={"d-round d-fav" + (fav ? " on" : "")} onClick={() => onFav(l.id)} aria-label="Favori">
             <svg viewBox="0 0 24 24" fill={fav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M12 20 C12 20 3 14 3 8.5 C3 5.5 5.4 4 7.5 4 C9.3 4 11 5.2 12 6.8 C13 5.2 14.7 4 16.5 4 C18.6 4 21 5.5 21 8.5 C21 14 12 20 12 20 Z" /></svg>
+          </button>
+          <button className="d-round d-share" aria-label="Partager cette chambre" onClick={() => {
+            const url = window.location.origin + window.location.pathname + "?chambre=" + l.id;
+            const prix = mode === "sejour" ? (l.prixNuit ? fmt(l.prixNuit) + " / nuit" : "") : (l.prixJour ? fmt(l.prixJour) + " / créneau" : "");
+            const texte = "🏠 " + l.nom + " — " + l.quartier + (prix ? "\n" + prix : "") + "\n👉 " + url;
+            if (navigator.share) { navigator.share({ title: l.nom, text: texte, url }).catch(() => {}); }
+            else { try { window.open("https://wa.me/?text=" + encodeURIComponent(texte), "_blank"); } catch (e) {} }
+          }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5 L15.4 17.5 M15.4 6.5 L8.6 10.5"/></svg>
           </button>
           {medias.length > 1 && (
             <>
@@ -1478,6 +1488,8 @@ export default function HkaCourtage() {
   const [mode, setMode] = useState("sejour");
   const [slots, setSlots] = useState(["jour"]);
   const [open, setOpen] = useState(null);
+  const [deepId] = useState(() => { try { return new URLSearchParams(window.location.search).get("chambre"); } catch (e) { return null; } });
+  const [deepDone, setDeepDone] = useState(false);
   const [ville, setVille] = useState("Dakar");
   const [quartier, setQuartier] = useState("Tous");
   const [tri, setTri] = useState("reco");
@@ -1508,6 +1520,13 @@ export default function HkaCourtage() {
     })();
     return () => { alive = false; };
   }, [adminOk]);
+
+  useEffect(() => {
+    if (!deepDone && deepId && chambres.length) {
+      const m = chambres.find(c => String(c.id) === String(deepId));
+      if (m) { setOpen(m); setDeepDone(true); }
+    }
+  }, [chambres, deepId, deepDone]);
 
   useEffect(() => {
     if (!supabaseReady) return;
