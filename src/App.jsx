@@ -1312,7 +1312,6 @@ function CompteScreen({ client, setClient, setTab, nbFav, nbResa, params }) {
           <div className="calc-field"><label>Nom</label><input value={nom} onChange={e => setNom(e.target.value)} placeholder="Votre nom" /></div>
           <div className="calc-field"><label>Téléphone</label><input value={tel} onChange={e => setTel(e.target.value)} placeholder="+221 ..." /></div>
           <button className="cta" style={{ width: "100%", opacity: tel.trim() ? 1 : 0.5 }} disabled={!tel.trim()} onClick={() => setClient({ nom: nom.trim() || "Client", tel: tel.trim() })}>Se connecter</button>
-          <p className="compte-note">Démo — la vraie connexion (par téléphone) arrive avec Supabase.</p>
         </>
       ) : (
         <>
