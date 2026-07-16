@@ -4,7 +4,8 @@ import { fetchChambres, createChambre, updateChambre, removeChambre } from "./li
 import { uploadMedia } from "./lib/storage.js";
 import { createReservation, fetchReservations, updateReservationStatut } from "./lib/reservations.js";
 import { logEvent, fetchStats } from "./lib/stats.js";
-import { fetchOccupations, addBlock, removeBlock } from "./lib/occupations.js";
+import { fetchAvis, fetchAllAvis, createAvis, approveAvis, removeAvis } from "./lib/avis.js";
+import { fetchOccupations, addBlock, removeBlock, blockOccupations } from "./lib/occupations.js";
 
 // ============================================================
 //  HKA · COURTAGE — Maquette (v1)
@@ -202,6 +203,17 @@ const STYLE = `
 .admin-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 20px; }
 .admin-tab { border: 1px solid var(--line); background: #fff; color: var(--ink); font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 14px; padding: 9px 16px; border-radius: 999px; cursor: pointer; transition: all .15s; }
 .admin-tab.on { background: var(--pine); border-color: var(--pine); color: #fff; }
+.tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 8px; border-radius: 999px; background: #C1544E; color: #fff; font-size: 12px; font-weight: 800; vertical-align: middle; }
+.avis-item { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+.avis-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.avis-top b { font-family: 'Bricolage Grotesque', sans-serif; font-size: 14px; }
+.avis-note { color: var(--sejour); font-size: 13px; letter-spacing: 1px; white-space: nowrap; }
+.avis-item p { font-size: 14px; color: #4a463d; margin: 6px 0 4px; }
+.avis-date { font-size: 12px; color: var(--muted); }
+.avis-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.avis-stars { display: flex; gap: 4px; }
+.avis-star { border: 0; background: none; cursor: pointer; font-size: 26px; line-height: 1; color: var(--line); padding: 0; }
+.avis-star.on { color: var(--sejour); }
 .admin-sub { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
 .dash-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
 .dash-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 3px; }
@@ -539,6 +551,48 @@ function Card({ l, i, mode, onOpen, fav, onFav, slots }) {
   );
 }
 
+function AvisSection({ chambreId }) {
+  const [list, setList] = useState([]);
+  const [nom, setNom] = useState("");
+  const [note, setNote] = useState(5);
+  const [txt, setTxt] = useState("");
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { let a = true; fetchAvis(chambreId).then(rows => { if (a) setList(rows.filter(x => x.approuve)); }); return () => { a = false; }; }, [chambreId]);
+  const moy = list.length ? (list.reduce((sm, x) => sm + x.note, 0) / list.length) : null;
+  const submit = async () => {
+    if (!txt.trim() || busy) return;
+    setBusy(true);
+    try { await createAvis({ chambreId, nom: nom.trim() || "Client", note, commentaire: txt.trim() }); setSent(true); } catch (e) {}
+    setBusy(false);
+  };
+  return (
+    <>
+      <h3 className="d-h3">Avis clients{moy ? " · ★ " + moy.toFixed(1) + " (" + list.length + ")" : ""}</h3>
+      {list.length === 0 && <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 4 }}>Pas encore d'avis — soyez le premier.</p>}
+      {list.map(a => (
+        <div className="avis-item" key={a.id}>
+          <div className="avis-top"><b>{a.nom}</b><span className="avis-note">{"★".repeat(a.note)}<span style={{ opacity: .3 }}>{"★".repeat(5 - a.note)}</span></span></div>
+          <p>{a.commentaire}</p>
+          {a.date ? <span className="avis-date">{a.date}</span> : null}
+        </div>
+      ))}
+      {sent ? (
+        <p style={{ color: "var(--pine)", fontWeight: 600, fontSize: 14, marginTop: 12 }}>Merci ! Votre avis sera publié après validation.</p>
+      ) : (
+        <div className="avis-form">
+          <input className="ainput" placeholder="Votre nom" value={nom} onChange={e => setNom(e.target.value)} />
+          <div className="avis-stars">
+            {[1, 2, 3, 4, 5].map(n => <button type="button" key={n} className={"avis-star" + (n <= note ? " on" : "")} onClick={() => setNote(n)} aria-label={n + " étoiles"}>★</button>)}
+          </div>
+          <textarea className="ainput" rows={2} style={{ resize: "vertical", fontFamily: "inherit" }} placeholder="Votre commentaire..." value={txt} onChange={e => setTxt(e.target.value)} />
+          <button className="abtn small" onClick={submit} disabled={busy || !txt.trim()}>{busy ? "Envoi…" : "Laisser un avis"}</button>
+        </div>
+      )}
+    </>
+  );
+}
+
 function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, initSlots, arrivee, datePassage }) {
   const [nuits, setNuits] = useState(initNuits || 3);
   const [slots, setSlots] = useState(initSlots && initSlots.length ? initSlots : ["jour"]);
@@ -653,6 +707,8 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
             {l.feats.map(f => <div className="d-feat" key={f}><span className="d-dot" />{f}</div>)}
           </div>
 
+          <AvisSection chambreId={l.id} />
+
           <h3 className="d-h3">{mode === "sejour" ? "Votre séjour" : "Votre passage"}</h3>
           <div className="calc">
             {mode === "sejour" ? (
@@ -692,8 +748,8 @@ function BookingSheet({ l, i, mode, onClose, onReserve, fav, onFav, initNuits, i
             <span>{resume}</span>
           </div>
           <div className="d-bar-actions">
-            <button className="cta" onClick={() => onReserve({ l, mode, nuits, slots: [...slots], calc, resume })} disabled={supabaseReady && unavailable}>Réserver</button>
-            <button className="wa" onClick={() => onReserve({ l, mode, nuits, slots: [...slots], calc, resume })} disabled={supabaseReady && unavailable}>WhatsApp</button>
+            <button className="cta" onClick={() => onReserve({ l, mode, nuits, slots: [...slots], calc, resume, arrivee, datePassage })} disabled={supabaseReady && unavailable}>Réserver</button>
+            <button className="wa" onClick={() => onReserve({ l, mode, nuits, slots: [...slots], calc, resume, arrivee, datePassage })} disabled={supabaseReady && unavailable}>WhatsApp</button>
           </div>
         </div>
       </div>
@@ -749,14 +805,18 @@ function AdminPanel({ chambres, setChambres, quartiers, reservations, setReserva
         <button className="adminbtn" style={{ marginLeft: "auto" }} onClick={onExit}>← Retour au site</button>
       </div>
       <div className="admin-tabs">
-        {[["dash", "Tableau de bord"], ["chambres", "Chambres"], ["resas", "Réservations"], ["dispos", "Disponibilités"], ["params", "Paramètres"]].map(([k, l]) => (
-          <button key={k} className={"admin-tab" + (section === k ? " on" : "")} onClick={() => setSection(k)}>{l}</button>
-        ))}
+        {[["dash", "Tableau de bord"], ["chambres", "Chambres"], ["resas", "Réservations"], ["dispos", "Disponibilités"], ["avis", "Avis"], ["params", "Paramètres"]].map(([k, l]) => {
+          const nb = k === "resas" ? reservations.filter(r => r.statut === "À confirmer").length : 0;
+          return (
+            <button key={k} className={"admin-tab" + (section === k ? " on" : "")} onClick={() => setSection(k)}>{l}{nb > 0 ? <span className="tab-badge">{nb}</span> : null}</button>
+          );
+        })}
       </div>
       {section === "dash" && <AdminDash chambres={chambres} reservations={reservations} quartiers={quartiers} />}
       {section === "chambres" && <AdminChambres chambres={chambres} setChambres={setChambres} quartiers={quartiers} />}
       {section === "resas" && <AdminResas reservations={reservations} setReservations={setReservations} />}
       {section === "dispos" && <AdminDispos chambres={chambres} />}
+      {section === "avis" && <AdminAvis chambres={chambres} />}
       {section === "params" && <AdminParams params={params} setParams={setParams} />}
     </div>
   );
@@ -979,6 +1039,23 @@ function AdminResas({ reservations, setReservations }) {
     setReservations(prev => prev.map(r => r.id === id ? { ...r, statut, garanti } : r));
     try { await updateReservationStatut(id, statut, garanti); } catch (e) {}
   };
+  const buildOcc = (r) => {
+    const rows = [];
+    if (!r.chambreId || !r.dateDebut) return rows;
+    const addD = (dstr, k) => { const p = (dstr || "").split("-").map(Number); if (!p[0]) return dstr; const d = new Date(p[0], p[1] - 1, p[2] + k); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+    if (r.mode === "sejour") {
+      let d = r.dateDebut, guard = 0; const end = r.dateFin || addD(r.dateDebut, 1);
+      while (d < end && guard < 366) { rows.push({ chambre_id: r.chambreId, date: d, creneau: "jour" }); rows.push({ chambre_id: r.chambreId, date: d, creneau: "nuit" }); d = addD(d, 1); guard++; }
+      if (!rows.length) { rows.push({ chambre_id: r.chambreId, date: r.dateDebut, creneau: "jour" }); rows.push({ chambre_id: r.chambreId, date: r.dateDebut, creneau: "nuit" }); }
+    } else {
+      (r.creneaux && r.creneaux.length ? r.creneaux : ["jour"]).forEach(cr => rows.push({ chambre_id: r.chambreId, date: r.dateDebut, creneau: cr }));
+    }
+    return rows;
+  };
+  const confirmer = async (r) => {
+    setStatut(r.id, "Confirmée", true);
+    try { await blockOccupations(buildOcc(r)); } catch (e) {}
+  };
   if (reservations.length === 0) return <p className="admin-sub">Aucune réservation pour l'instant. Les demandes des clients apparaîtront ici.</p>;
   return (
     <div className="acard">
@@ -995,7 +1072,7 @@ function AdminResas({ reservations, setReservations }) {
               </span>
             </div>
             <div className="acts">
-              {r.statut !== "Confirmée" && <button className="abtn small" onClick={() => setStatut(r.id, "Confirmée", true)}>Confirmer</button>}
+              {r.statut !== "Confirmée" && <button className="abtn small" onClick={() => confirmer(r)}>Confirmer</button>}
               {r.statut !== "Annulée" && <button className="abtn ghost small" onClick={() => setStatut(r.id, "Annulée", false)}>Annuler</button>}
             </div>
           </div>
@@ -1105,6 +1182,40 @@ function AdminDispos({ chambres }) {
   );
 }
 
+function AdminAvis({ chambres }) {
+  const [list, setList] = useState([]);
+  const [msg, setMsg] = useState("");
+  useEffect(() => { fetchAllAvis().then(setList); }, []);
+  const approve = async (id) => { try { await approveAvis(id); setList(prev => prev.map(a => a.id === id ? { ...a, approuve: true } : a)); } catch (e) { setMsg("Action refusée — connecte-toi en admin."); } };
+  const del = async (id) => { try { await removeAvis(id); setList(prev => prev.filter(a => a.id !== id)); } catch (e) { setMsg("Suppression refusée."); } };
+  const chNom = (id) => (chambres.find(c => c.id === id) || {}).nom || "—";
+  return (
+    <div className="acard">
+      <h3>Avis clients ({list.length})</h3>
+      {list.length === 0 && <p className="admin-sub">Aucun avis pour l'instant.</p>}
+      <div className="alist">
+        {list.map(a => (
+          <div className="aitem" key={a.id}>
+            <div className="info">
+              <b>{a.nom} · {"★".repeat(a.note)}</b>
+              <span>{a.commentaire}</span>
+              <span style={{ display: "block", marginTop: 5 }}>
+                <span className="pill">{chNom(a.chambreId)}</span>
+                <span className={"stbadge " + (a.approuve ? "on" : "warn")}>{a.approuve ? "Publié" : "À valider"}</span> {a.date}
+              </span>
+            </div>
+            <div className="acts">
+              {!a.approuve && <button className="abtn small" onClick={() => approve(a.id)}>Publier</button>}
+              <button className="abtn danger" onClick={() => del(a.id)}>Suppr.</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {msg && <p style={{ color: "#C1544E", fontWeight: 600, marginTop: 10 }}>{msg}</p>}
+    </div>
+  );
+}
+
 function AdminParams({ params, setParams }) {
   const set = (k, v) => setParams(p => ({ ...p, [k]: v }));
   return (
@@ -1193,6 +1304,10 @@ function BottomNav({ tab, setTab }) {
 
 function RecapResa({ resa, onClose, onConfirm, onDone, client, params = {} }) {
   const { l, mode, calc, resume } = resa;
+  const addD = (dstr, k) => { const p = (dstr || "").split("-").map(Number); if (!p[0]) return dstr || null; const d = new Date(p[0], p[1] - 1, p[2] + k); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  const dateDebut = mode === "sejour" ? (resa.arrivee || null) : (resa.datePassage || null);
+  const dateFin = mode === "sejour" ? (resa.arrivee ? addD(resa.arrivee, resa.nuits || 1) : null) : (resa.datePassage || null);
+  const creneaux = mode === "sejour" ? [] : (resa.slots || []).map(x => x === "soiree" ? "nuit" : "jour");
   const [nom, setNom] = useState(client ? client.nom : "");
   const [tel, setTel] = useState(client ? client.tel : "");
   const [pay, setPay] = useState(null);
@@ -1221,6 +1336,7 @@ function RecapResa({ resa, onClose, onConfirm, onDone, client, params = {} }) {
       total: calc.total, pay: payLabel[pay], garanti: g,
       statut: g ? "Confirmée" : "À confirmer",
       date: new Date().toLocaleDateString("fr-FR"),
+      chambreId: l.id, dateDebut, dateFin, creneaux,
     };
     const saved = await createReservation(base);
     onConfirm(saved);

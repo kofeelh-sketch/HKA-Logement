@@ -2,8 +2,8 @@ import { supabase, supabaseReady } from "./supabase.js";
 
 // ------------------------------------------------------------
 //  Réservations (demandes clients) enregistrées dans Supabase.
-//  Insertion publique (un client crée sa demande) ; lecture et
-//  gestion réservées à l'admin (RLS). Voir schema_reservations.sql.
+//  Insertion publique ; lecture et gestion réservées à l'admin.
+//  Porte aussi chambre_id + dates + créneaux pour le blocage auto.
 // ------------------------------------------------------------
 
 export function rowToResa(r) {
@@ -20,10 +20,13 @@ export function rowToResa(r) {
     garanti: !!r.garanti,
     statut: r.statut || "À confirmer",
     date: r.created_at ? new Date(r.created_at).toLocaleDateString("fr-FR") : "",
+    chambreId: r.chambre_id || null,
+    dateDebut: r.date_debut || null,
+    dateFin: r.date_fin || null,
+    creneaux: r.creneaux || [],
   };
 }
 
-// Crée la réservation. Renvoie l'objet (avec id réel si Supabase, sinon local).
 export async function createReservation(r) {
   if (!supabaseReady) return { ...r, id: r.id || Date.now() };
   const { data, error } = await supabase
@@ -33,6 +36,10 @@ export async function createReservation(r) {
       client_nom: r.nom, client_tel: r.tel,
       mode: r.mode, resume: r.resume, total: r.total ?? 0,
       moyen_paiement: r.pay, garanti: !!r.garanti, statut: r.statut,
+      chambre_id: r.chambreId || null,
+      date_debut: r.dateDebut || null,
+      date_fin: r.dateFin || null,
+      creneaux: r.creneaux || null,
     })
     .select()
     .single();
@@ -40,7 +47,6 @@ export async function createReservation(r) {
   return rowToResa(data);
 }
 
-// Liste (admin).
 export async function fetchReservations() {
   if (!supabaseReady) return [];
   const { data, error } = await supabase
@@ -51,7 +57,6 @@ export async function fetchReservations() {
   return data.map(rowToResa);
 }
 
-// Changer le statut (admin).
 export async function updateReservationStatut(id, statut, garanti) {
   if (!supabaseReady) return;
   const { error } = await supabase

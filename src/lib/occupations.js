@@ -36,3 +36,13 @@ export async function removeBlock(id) {
   const { error } = await supabase.from("occupations").delete().eq("id", id);
   if (error) throw error;
 }
+
+// Bloque plusieurs créneaux d'un coup (utilisé à la confirmation d'une réservation).
+// Ignore les créneaux déjà bloqués (pas d'erreur de doublon).
+export async function blockOccupations(rows) {
+  if (!supabaseReady || !rows || !rows.length) return;
+  const { error } = await supabase
+    .from("occupations")
+    .upsert(rows.map(r => ({ ...r, motif: "reservation" })), { onConflict: "chambre_id,date,creneau", ignoreDuplicates: true });
+  if (error) throw error;
+}
